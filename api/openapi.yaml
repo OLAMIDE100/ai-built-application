@@ -1,0 +1,634 @@
+openapi: 3.0.3
+info:
+  title: Snake Game API
+  description: |
+    RESTful API for the Snake Game multiplayer application.
+    Provides authentication, leaderboard, and game score management.
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@snakegame.com
+
+servers:
+  - url: http://localhost:8000/api/v1
+    description: Local development server
+  - url: https://api.snakegame.com/api/v1
+    description: Production server
+
+tags:
+  - name: Authentication
+    description: User authentication and session management
+  - name: Leaderboard
+    description: Game scores and leaderboard operations
+  - name: Players
+    description: Active players and game watching (for future use)
+
+paths:
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      summary: User login
+      description: Authenticate a user with email and password
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: player1@example.com
+              password: password123
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                success: true
+                user:
+                  id: 1
+                  username: player1
+                  email: player1@example.com
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: Invalid email or password
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/signup:
+    post:
+      tags:
+        - Authentication
+      summary: User registration
+      description: Create a new user account
+      operationId: signup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+            example:
+              username: newplayer
+              email: newplayer@example.com
+              password: password123
+      responses:
+        '201':
+          description: User created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                success: true
+                user:
+                  id: 3
+                  username: newplayer
+                  email: newplayer@example.com
+        '409':
+          description: Conflict - email or username already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                emailExists:
+                  value:
+                    success: false
+                    error: Email already exists
+                usernameExists:
+                  value:
+                    success: false
+                    error: Username already exists
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/logout:
+    post:
+      tags:
+        - Authentication
+      summary: User logout
+      description: Log out the current user
+      operationId: logout
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/me:
+    get:
+      tags:
+        - Authentication
+      summary: Get current user
+      description: Get the currently authenticated user's information
+      operationId: getCurrentUser
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+              example:
+                id: 1
+                username: player1
+                email: player1@example.com
+        '401':
+          description: Unauthorized - not logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: Unauthorized
+
+  /leaderboard:
+    get:
+      tags:
+        - Leaderboard
+      summary: Get leaderboard
+      description: Retrieve the top scores leaderboard
+      operationId: getLeaderboard
+      parameters:
+        - name: limit
+          in: query
+          description: Maximum number of entries to return
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 10
+          example: 10
+        - name: mode
+          in: query
+          description: Filter by game mode
+          required: false
+          schema:
+            $ref: '#/components/schemas/GameMode'
+      responses:
+        '200':
+          description: Leaderboard retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaderboardResponse'
+              example:
+                success: true
+                leaderboard:
+                  - id: 3
+                    userId: 1
+                    username: player1
+                    score: 200
+                    mode: wall
+                    timestamp: 1704067200000
+                    rank: 1
+                  - id: 1
+                    userId: 1
+                    username: player1
+                    score: 150
+                    mode: wall
+                    timestamp: 1704063600000
+                    rank: 2
+                  - id: 2
+                    userId: 2
+                    username: player2
+                    score: 120
+                    mode: pass
+                    timestamp: 1704056400000
+                    rank: 3
+
+  /scores:
+    post:
+      tags:
+        - Leaderboard
+      summary: Submit a game score
+      description: Submit a new game score for the authenticated user
+      operationId: submitScore
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ScoreSubmission'
+            example:
+              score: 150
+              mode: wall
+      responses:
+        '201':
+          description: Score submitted successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ScoreResponse'
+              example:
+                success: true
+                score:
+                  id: 4
+                  userId: 1
+                  username: player1
+                  score: 150
+                  mode: wall
+                  timestamp: 1704067200000
+        '401':
+          description: Unauthorized - not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                error: Not authenticated
+        '400':
+          description: Bad request - invalid score or mode
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /players/active:
+    get:
+      tags:
+        - Players
+      summary: Get active players
+      description: Get list of currently active players (for future watch feature)
+      operationId: getActivePlayers
+      responses:
+        '200':
+          description: List of active players
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActivePlayersResponse'
+              example:
+                success: true
+                players:
+                  - id: 1
+                    username: player1
+                    score: 45
+                    mode: wall
+                  - id: 2
+                    username: player2
+                    score: 32
+                    mode: pass
+
+  /players/{playerId}/watch:
+    get:
+      tags:
+        - Players
+      summary: Watch a player's game
+      description: Get the current game state of a specific player (for future watch feature)
+      operationId: watchPlayer
+      parameters:
+        - name: playerId
+          in: path
+          required: true
+          description: ID of the player to watch
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Player game state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WatchPlayerResponse'
+        '404':
+          description: Player not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    # Authentication Schemas
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: player1@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          description: User's password
+          example: password123
+
+    SignupRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9_]+$'
+          description: Unique username
+          example: newplayer
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: newplayer@example.com
+        password:
+          type: string
+          format: password
+          minLength: 6
+          maxLength: 100
+          description: User's password (minimum 6 characters)
+          example: password123
+
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique user identifier
+          example: 1
+        username:
+          type: string
+          description: User's username
+          example: player1
+        email:
+          type: string
+          format: email
+          description: User's email address
+          example: player1@example.com
+      required:
+        - id
+        - username
+        - email
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        user:
+          $ref: '#/components/schemas/User'
+      required:
+        - success
+        - user
+
+    # Leaderboard Schemas
+    GameMode:
+      type: string
+      enum:
+        - wall
+        - pass
+      description: |
+        wall - Game ends when snake hits walls
+        pass - Snake wraps around edges
+      example: wall
+
+    ScoreSubmission:
+      type: object
+      required:
+        - score
+        - mode
+      properties:
+        score:
+          type: integer
+          minimum: 0
+          description: Game score
+          example: 150
+        mode:
+          $ref: '#/components/schemas/GameMode'
+
+    Score:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Unique score identifier
+          example: 1
+        userId:
+          type: integer
+          description: ID of the user who achieved this score
+          example: 1
+        username:
+          type: string
+          description: Username of the player
+          example: player1
+        score:
+          type: integer
+          description: Game score
+          example: 150
+        mode:
+          $ref: '#/components/schemas/GameMode'
+        timestamp:
+          type: integer
+          format: int64
+          description: Unix timestamp in milliseconds when score was achieved
+          example: 1704067200000
+        rank:
+          type: integer
+          description: Rank position in leaderboard (only in leaderboard responses)
+          example: 1
+      required:
+        - id
+        - userId
+        - username
+        - score
+        - mode
+        - timestamp
+
+    LeaderboardResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        leaderboard:
+          type: array
+          items:
+            $ref: '#/components/schemas/Score'
+      required:
+        - success
+        - leaderboard
+
+    ScoreResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        score:
+          $ref: '#/components/schemas/Score'
+      required:
+        - success
+        - score
+
+    # Players Schemas
+    ActivePlayer:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Player ID
+          example: 1
+        username:
+          type: string
+          description: Player username
+          example: player1
+        score:
+          type: integer
+          description: Current game score
+          example: 45
+        mode:
+          $ref: '#/components/schemas/GameMode'
+      required:
+        - id
+        - username
+        - score
+        - mode
+
+    ActivePlayersResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        players:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActivePlayer'
+      required:
+        - success
+        - players
+
+    GameState:
+      type: object
+      description: Current state of a player's game
+      properties:
+        snake:
+          type: array
+          items:
+            type: object
+            properties:
+              x:
+                type: integer
+                description: X coordinate
+                example: 5
+              y:
+                type: integer
+                description: Y coordinate
+                example: 5
+          description: Array of snake body segments
+        food:
+          type: object
+          properties:
+            x:
+              type: integer
+              example: 10
+            y:
+              type: integer
+              example: 10
+          description: Food position
+        score:
+          type: integer
+          example: 15
+        mode:
+          $ref: '#/components/schemas/GameMode'
+
+    WatchPlayerResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        player:
+          type: object
+          properties:
+            id:
+              type: integer
+              example: 1
+            username:
+              type: string
+              example: player1
+            gameState:
+              $ref: '#/components/schemas/GameState'
+      required:
+        - success
+        - player
+
+    # Common Schemas
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+      required:
+        - success
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error:
+          type: string
+          description: Error message
+          example: Invalid email or password
+      required:
+        - success
+        - error
+

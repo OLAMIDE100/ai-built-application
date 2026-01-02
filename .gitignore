@@ -24,3 +24,4 @@ frontend/dist-ssr
 *.sw?
 
 frontend/COMMANDS.md
+backend/backend
