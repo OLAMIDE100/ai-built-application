@@ -27,6 +27,7 @@ export default function SnakeGame({
   const [gameStarted, setGameStarted] = useState(false);
   const [paused, setPaused] = useState(false);
   const [showModeSelection, setShowModeSelection] = useState(true);
+  const scoreSubmittedRef = useRef(false);
 
   const directionRef = useRef(direction);
   directionRef.current = direction;
@@ -59,9 +60,6 @@ export default function SnakeGame({
           if (onGameOver) {
             onGameOver(score);
           }
-          if (onScoreSubmit && score > 0) {
-            onScoreSubmit(score, mode);
-          }
           return prev;
         }
 
@@ -75,7 +73,15 @@ export default function SnakeGame({
     }, 120);
 
     return () => clearInterval(interval);
-  }, [food, gameOver, mode, gameStarted, paused, currentDirection, onGameOver, onScoreSubmit, score]);
+  }, [food, gameOver, mode, gameStarted, paused, currentDirection, onGameOver]);
+
+  // Submit score only once when game ends
+  useEffect(() => {
+    if (gameOver && onScoreSubmit && score > 0 && !scoreSubmittedRef.current) {
+      scoreSubmittedRef.current = true;
+      onScoreSubmit(score, mode);
+    }
+  }, [gameOver, score, mode, onScoreSubmit]);
 
   const resetGame = () => {
     setSnake(INITIAL_SNAKE);
@@ -87,6 +93,7 @@ export default function SnakeGame({
     setPaused(false);
     setMode(null);
     setShowModeSelection(true);
+    scoreSubmittedRef.current = false; // Reset score submission flag
   };
 
   const playAgain = () => {
@@ -102,6 +109,7 @@ export default function SnakeGame({
     setGameStarted(true);
     setPaused(false);
     setShowModeSelection(false);
+    scoreSubmittedRef.current = false; // Reset score submission flag
   };
 
   const handleModeSelect = (selectedMode) => {

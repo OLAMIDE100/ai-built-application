@@ -46,16 +46,13 @@ async def submit_score(
         mode=score_submission.mode
     )
     
-    # Get the created score
-    user = db.get_user_by_id(user_id)
-    score_data = {
-        "id": score_id,
-        "userId": user_id,
-        "username": user["username"],
-        "score": score_submission.score,
-        "mode": score_submission.mode.value,
-        "timestamp": db.scores[score_id]["timestamp"]
-    }
+    # Get the created score with all details
+    score_data = db.get_score_by_id(score_id)
+    if not score_data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to retrieve created score"
+        )
     
     score = Score(
         id=score_data["id"],

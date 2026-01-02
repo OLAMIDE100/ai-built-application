@@ -25,3 +25,10 @@ frontend/dist-ssr
 
 frontend/COMMANDS.md
 backend/backend
+
+# Database files
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/snake_game.db

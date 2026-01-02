@@ -121,23 +121,46 @@ curl -X GET http://localhost:8000/api/v1/auth/me \
   -H "Authorization: Bearer <your-token>"
 ```
 
-## Mock Database
+## Database
 
-Currently uses an in-memory mock database (`app/database.py`). This will be replaced with a real database (PostgreSQL, MongoDB, etc.) later.
+The application uses SQLAlchemy with support for both **SQLite** (default) and **PostgreSQL**.
 
-The mock database:
-- Stores users and scores in memory
-- Includes test data initialization
-- Provides password hashing (bcrypt)
-- Resets on server restart
+### Database Setup
 
-## Environment Variables
+1. **SQLite (Default - No setup required)**
+   - SQLite is used by default for development
+   - Database file: `snake_game.db` in the backend directory
+   - No additional configuration needed
 
-For production, set these environment variables:
+2. **PostgreSQL (Production)**
+   - Set the `DATABASE_URL` in the `.env` file (see Environment Variables section below)
+   - Make sure PostgreSQL is installed and running
+   - Create the database: `createdb snake_game`
+
+### Initialize Database
+
+Run the initialization script to create tables:
 
 ```bash
-SECRET_KEY=your-secret-key-here  # Change from default!
-DATABASE_URL=postgresql://...    # When implementing real DB
+python init_db.py
+```
+
+### Database Models
+
+- **User**: Stores user accounts (id, username, email, password_hash, created_at)
+- **Score**: Stores game scores (id, user_id, score, mode, timestamp)
+
+### Environment Variables
+
+Create a `.env` file in the backend directory:
+
+```bash
+# Database (optional - defaults to SQLite)
+DATABASE_URL=sqlite:///./snake_game.db  # SQLite
+# DATABASE_URL=postgresql://user:password@localhost:5432/snake_game  # PostgreSQL
+
+# JWT Secret Key (change in production!)
+SECRET_KEY=your-secret-key-here-change-in-production
 ```
 
 ## Next Steps
