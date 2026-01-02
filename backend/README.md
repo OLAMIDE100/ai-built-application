@@ -49,16 +49,21 @@ pip install -r requirements.txt
 ### 2. Run the Server
 
 ```bash
-uvicorn app.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8001
 ```
 
-The API will be available at `http://localhost:8000`
+Or use the run script:
+```bash
+python run.py
+```
+
+The API will be available at `http://localhost:8001`
 
 ### 3. API Documentation
 
 Once the server is running, you can access:
-- **Swagger UI**: http://localhost:8000/docs
-- **ReDoc**: http://localhost:8000/redoc
+- **Swagger UI**: http://localhost:8001/docs
+- **ReDoc**: http://localhost:8001/redoc
 
 ## Running Tests
 
