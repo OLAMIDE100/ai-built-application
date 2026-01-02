@@ -25,6 +25,7 @@ export default function SnakeGame({
   const [score, setScore] = useState(0);
   const [mode, setMode] = useState(initialMode);
   const [gameStarted, setGameStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
 
   const directionRef = useRef(direction);
   directionRef.current = direction;
@@ -46,7 +47,7 @@ export default function SnakeGame({
   }, [controlled]);
 
   useEffect(() => {
-    if (gameOver || !gameStarted) return;
+    if (gameOver || !gameStarted || paused) return;
 
     const interval = setInterval(() => {
       setSnake(prev => {
@@ -73,7 +74,7 @@ export default function SnakeGame({
     }, 120);
 
     return () => clearInterval(interval);
-  }, [food, gameOver, mode, gameStarted, currentDirection, onGameOver, onScoreSubmit, score]);
+  }, [food, gameOver, mode, gameStarted, paused, currentDirection, onGameOver, onScoreSubmit, score]);
 
   const resetGame = () => {
     setSnake(INITIAL_SNAKE);
@@ -82,6 +83,7 @@ export default function SnakeGame({
     setGameOver(false);
     setScore(0);
     setGameStarted(false);
+    setPaused(false);
   };
 
   const playAgain = () => {
@@ -91,11 +93,22 @@ export default function SnakeGame({
     setGameOver(false);
     setScore(0);
     setGameStarted(true);
+    setPaused(false);
   };
 
-  const startGame = () => {
-    setGameStarted(true);
-    setGameOver(false);
+  const toggleGame = () => {
+    if (!gameStarted) {
+      // Start the game
+      setGameStarted(true);
+      setGameOver(false);
+      setPaused(false);
+    } else if (paused) {
+      // Resume the game
+      setPaused(false);
+    } else {
+      // Pause the game
+      setPaused(true);
+    }
   };
 
   return (
@@ -145,17 +158,24 @@ export default function SnakeGame({
       </div>
 
       <div className="text-lg">Score: {score}</div>
+      {paused && gameStarted && (
+        <div className="text-lg font-semibold text-yellow-600">PAUSED</div>
+      )}
 
       {showControls && (
         <div className="flex gap-3 items-center">
-          {!gameStarted && (
-            <button
-              onClick={startGame}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Start
-            </button>
-          )}
+          <button
+            onClick={toggleGame}
+            className={`px-4 py-2 text-white rounded hover:opacity-90 ${
+              !gameStarted
+                ? 'bg-green-600 hover:bg-green-700'
+                : paused
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-yellow-600 hover:bg-yellow-700'
+            }`}
+          >
+            {!gameStarted ? 'Start' : paused ? 'Resume' : 'Pause'}
+          </button>
           {gameStarted && (
             <button
               onClick={resetGame}
