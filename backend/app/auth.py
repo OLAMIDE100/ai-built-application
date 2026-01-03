@@ -1,12 +1,13 @@
 from datetime import datetime, timedelta
 from typing import Optional
+import os
 from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
-# JWT settings
-SECRET_KEY = "your-secret-key-change-in-production"  # Change in production!
-ALGORITHM = "HS256"
+# JWT settings - read from environment variables
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
 security = HTTPBearer()

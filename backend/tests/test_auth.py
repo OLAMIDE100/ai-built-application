@@ -1,47 +1,22 @@
 import pytest
-from fastapi.testclient import TestClient
-from app.main import app
-from app.database import MockDatabase
-
-client = TestClient(app)
-
-# Helper to ensure passwords are safe for bcrypt (<= 72 bytes)
-def safe_password(pwd: str) -> str:
-    """Ensure password is <= 72 bytes for bcrypt"""
-    pwd_bytes = pwd.encode('utf-8')
-    if len(pwd_bytes) <= 72:
-        return pwd
-    # Truncate to 72 bytes safely
-    truncated = pwd_bytes[:70]
-    while truncated and (truncated[-1] & 0b11000000) == 0b10000000:
-        truncated = truncated[:-1]
-    return truncated.decode('utf-8', errors='ignore')
+from tests.conftest import safe_password, clean_db, client
 
 
-@pytest.fixture
-def clean_db():
-    """Create a fresh database instance for each test"""
-    from app import database
-    # Create database without test data initialization to avoid password issues
-    database.db = MockDatabase(initialize_test_data=False)
-    return database.db
-
-
-def test_root():
+def test_root(client):
     """Test root endpoint"""
     response = client.get("/")
     assert response.status_code == 200
     assert "message" in response.json()
 
 
-def test_health():
+def test_health(client):
     """Test health endpoint"""
     response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "healthy"}
 
 
-def test_signup_success(clean_db):
+def test_signup_success(client, clean_db):
     """Test successful user registration"""
     response = client.post(
         "/api/v1/auth/signup",
@@ -60,7 +35,7 @@ def test_signup_success(clean_db):
     assert data["token"] is not None
 
 
-def test_signup_duplicate_email(clean_db):
+def test_signup_duplicate_email(client, clean_db):
     """Test signup with duplicate email"""
     # First signup
     client.post(
@@ -85,7 +60,7 @@ def test_signup_duplicate_email(clean_db):
     assert "already exists" in response.json()["detail"].lower()
 
 
-def test_signup_duplicate_username(clean_db):
+def test_signup_duplicate_username(client, clean_db):
     """Test signup with duplicate username"""
     # First signup
     client.post(
@@ -110,7 +85,7 @@ def test_signup_duplicate_username(clean_db):
     assert "already exists" in response.json()["detail"].lower()
 
 
-def test_login_success(clean_db):
+def test_login_success(client, clean_db):
     """Test successful login"""
     # First create a user
     client.post(
@@ -138,7 +113,7 @@ def test_login_success(clean_db):
     assert data["token"] is not None
 
 
-def test_login_invalid_credentials(clean_db):
+def test_login_invalid_credentials(client, clean_db):
     """Test login with invalid credentials"""
     response = client.post(
         "/api/v1/auth/login",
@@ -151,7 +126,7 @@ def test_login_invalid_credentials(clean_db):
     assert "invalid" in response.json()["detail"].lower()
 
 
-def test_login_wrong_password(clean_db):
+def test_login_wrong_password(client, clean_db):
     """Test login with wrong password"""
     # Create user
     client.post(
@@ -175,7 +150,7 @@ def test_login_wrong_password(clean_db):
     assert "invalid" in response.json()["detail"].lower()
 
 
-def test_get_current_user(clean_db):
+def test_get_current_user(client, clean_db):
     """Test getting current user with valid token"""
     # Signup and get token
     signup_response = client.post(
@@ -202,13 +177,13 @@ def test_get_current_user(clean_db):
     assert data["email"] == "currentuser@example.com"
 
 
-def test_get_current_user_no_token(clean_db):
+def test_get_current_user_no_token(client, clean_db):
     """Test getting current user without token"""
     response = client.get("/api/v1/auth/me")
     assert response.status_code == 403  # FastAPI returns 403 for missing auth
 
 
-def test_logout(clean_db):
+def test_logout(client, clean_db):
     """Test logout endpoint"""
     response = client.post("/api/v1/auth/logout")
     assert response.status_code == 200

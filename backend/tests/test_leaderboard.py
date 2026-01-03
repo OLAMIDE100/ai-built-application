@@ -1,36 +1,11 @@
 import pytest
 import uuid
-from fastapi.testclient import TestClient
-from app.main import app
-from app.database import MockDatabase
 from app.models import GameMode
-
-client = TestClient(app)
-
-# Helper to ensure passwords are safe for bcrypt (<= 72 bytes)
-def safe_password(pwd: str) -> str:
-    """Ensure password is <= 72 bytes for bcrypt"""
-    pwd_bytes = pwd.encode('utf-8')
-    if len(pwd_bytes) <= 72:
-        return pwd
-    # Truncate to 70 bytes safely
-    truncated = pwd_bytes[:70]
-    while truncated and (truncated[-1] & 0b11000000) == 0b10000000:
-        truncated = truncated[:-1]
-    return truncated.decode('utf-8', errors='ignore')
+from tests.conftest import safe_password, clean_db, client
 
 
 @pytest.fixture
-def clean_db():
-    """Create a fresh database instance for each test"""
-    from app import database
-    # Create database without test data initialization to avoid password issues
-    database.db = MockDatabase(initialize_test_data=False)
-    return database.db
-
-
-@pytest.fixture
-def auth_token(clean_db):
+def auth_token(client, clean_db):
     """Create a user and return auth token and username"""
     # Generate unique username and email for each test to avoid conflicts
     unique_id = str(uuid.uuid4())[:8]
@@ -52,7 +27,7 @@ def auth_token(clean_db):
     return {"token": data["token"], "username": username}
 
 
-def test_get_leaderboard(clean_db):
+def test_get_leaderboard(client, clean_db):
     """Test getting leaderboard"""
     response = client.get("/api/v1/leaderboard")
     assert response.status_code == 200
@@ -62,7 +37,7 @@ def test_get_leaderboard(clean_db):
     assert isinstance(data["leaderboard"], list)
 
 
-def test_get_leaderboard_with_limit(clean_db):
+def test_get_leaderboard_with_limit(client, clean_db):
     """Test getting leaderboard with limit"""
     response = client.get("/api/v1/leaderboard?limit=5")
     assert response.status_code == 200
@@ -71,7 +46,7 @@ def test_get_leaderboard_with_limit(clean_db):
     assert len(data["leaderboard"]) <= 5
 
 
-def test_get_leaderboard_with_mode_filter(clean_db):
+def test_get_leaderboard_with_mode_filter(client, clean_db):
     """Test getting leaderboard filtered by mode"""
     response = client.get("/api/v1/leaderboard?mode=wall")
     assert response.status_code == 200
@@ -82,7 +57,7 @@ def test_get_leaderboard_with_mode_filter(clean_db):
         assert score["mode"] == "wall"
 
 
-def test_submit_score(clean_db, auth_token):
+def test_submit_score(client, clean_db, auth_token):
     """Test submitting a score"""
     response = client.post(
         "/api/v1/scores",
@@ -100,7 +75,7 @@ def test_submit_score(clean_db, auth_token):
     assert data["score"]["username"] == auth_token["username"]
 
 
-def test_submit_score_no_auth(clean_db):
+def test_submit_score_no_auth(client, clean_db):
     """Test submitting score without authentication"""
     response = client.post(
         "/api/v1/scores",
@@ -112,7 +87,7 @@ def test_submit_score_no_auth(clean_db):
     assert response.status_code == 403  # FastAPI returns 403 for missing auth
 
 
-def test_submit_score_negative(clean_db, auth_token):
+def test_submit_score_negative(client, clean_db, auth_token):
     """Test submitting negative score (should fail validation)"""
     response = client.post(
         "/api/v1/scores",
@@ -125,7 +100,7 @@ def test_submit_score_negative(clean_db, auth_token):
     assert response.status_code == 422  # Validation error
 
 
-def test_leaderboard_ordering(clean_db, auth_token):
+def test_leaderboard_ordering(client, clean_db, auth_token):
     """Test that leaderboard is ordered by score descending"""
     # Submit multiple scores
     client.post(
@@ -153,7 +128,7 @@ def test_leaderboard_ordering(clean_db, auth_token):
         assert scores[i]["score"] >= scores[i + 1]["score"]
 
 
-def test_leaderboard_ranks(clean_db):
+def test_leaderboard_ranks(client, clean_db):
     """Test that leaderboard includes rank numbers"""
     response = client.get("/api/v1/leaderboard")
     assert response.status_code == 200

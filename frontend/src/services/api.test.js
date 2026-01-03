@@ -47,6 +47,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           user: mockUser,
@@ -68,6 +73,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           detail: 'Invalid email or password',
         }),
@@ -90,6 +99,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
+        statusText: 'Created',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           user: mockUser,
@@ -109,6 +122,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
+        statusText: 'Conflict',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           detail: 'Email already exists',
         }),
@@ -124,6 +141,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 409,
+        statusText: 'Conflict',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           detail: 'Username already exists',
         }),
@@ -142,6 +163,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
         }),
@@ -165,6 +191,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => mockUser,
       });
 
@@ -183,6 +214,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 401,
+        statusText: 'Unauthorized',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           detail: 'Invalid token',
         }),
@@ -215,6 +250,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           leaderboard: mockLeaderboard,
@@ -238,6 +278,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           leaderboard: mockLeaderboard,
@@ -263,6 +308,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           leaderboard: mockLeaderboard,
@@ -281,6 +331,11 @@ describe('API Service', () => {
     it('should include mode filter when provided', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           leaderboard: [],
@@ -310,6 +365,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         status: 201,
+        statusText: 'Created',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           score: mockScore,
@@ -347,6 +406,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
+        statusText: 'Bad Request',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           detail: 'Invalid score',
         }),
@@ -368,6 +431,11 @@ describe('API Service', () => {
       
       global.fetch.mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        statusText: 'OK',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({
           success: true,
           players: mockPlayers,
@@ -395,6 +463,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        statusText: 'Internal Server Error',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => {
           throw new Error('JSON parse error');
         },
@@ -412,6 +484,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 400,
+        statusText: 'Bad Request',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => 'Bad request',
       });
 
@@ -425,6 +501,10 @@ describe('API Service', () => {
       global.fetch.mockResolvedValueOnce({
         ok: false,
         status: 500,
+        statusText: 'Internal Server Error',
+        headers: {
+          get: vi.fn(() => 'application/json'),
+        },
         json: async () => ({}),
       });
 
