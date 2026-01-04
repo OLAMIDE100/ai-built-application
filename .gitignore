@@ -32,3 +32,4 @@ backend/backend
 *.sqlite
 *.sqlite3
 backend/snake_game.db
+.env
