@@ -121,9 +121,9 @@ jobs:
 
       - name: Terraform Validate
         run: |
-          echo "yes" | terraform init 
-          echo "yes" | terraform validate 
-          echo "yes" | terraform fmt -check
+          echo "yes" | terraform init \
+          echo "yes" | terraform validate \
+          echo "yes" | terraform fmt -check \
 
   terraform-plan:
     name: Terraform Plan
@@ -156,9 +156,9 @@ jobs:
 
       - name: Terraform Init
         run: |
-          echo "yes" | terraform init 
-          echo "yes" | terraform plan -out=tfplan 
-          echo "yes" | terraform show -json tfplan > tfplan.json
+          echo "yes" | terraform init \
+          echo "yes" | terraform plan -out=tfplan \
+          echo "yes" | terraform show -json tfplan > tfplan.json \
 
       - name: Run Conftest
         uses: open-policy-agent/conftest-action@v1
@@ -200,9 +200,9 @@ jobs:
 
       - name: Terraform Init
         run: |
-          export TF_VAR_snake_game_db_password=$(gcloud secrets versions access latest --secret="snake-game"  --project $PROJECT_ID | jq -r ".\"postgres-password\"" ) && \
-          terraform init && \
-          terraform plan && \
+          export TF_VAR_snake_game_db_password=$(gcloud secrets versions access latest --secret="snake-game"  --project $PROJECT_ID | jq -r ".\"postgres-password\"" )   \
+          echo "yes" | terraform init \
+          echo "yes" | terraform plan \
           terraform apply -auto-approve 
 
   
