@@ -15,7 +15,8 @@ app.add_middleware(
         "http://localhost:5176",  # Vite default port
         "http://localhost:3000",     # Alternative frontend port
         "http://127.0.0.1:5173",    # Alternative localhost format
-        "http://127.0.0.1:3000",    # Alternative localhost format
+        "http://127.0.0.1:3000",
+        "https://snake-game.nabuminds-test.app"    # Alternative localhost format
     ],
     allow_credentials=True,
     allow_methods=["*"],

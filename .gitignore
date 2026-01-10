@@ -23,7 +23,7 @@ frontend/dist-ssr
 *.sln
 *.sw?
 
-frontend/COMMANDS.md
+
 backend/backend
 
 # Database files
@@ -33,3 +33,18 @@ backend/backend
 *.sqlite3
 backend/snake_game.db
 .env
+archive
+
+# Generated deployment files
+infrastructure/manifest/workloads/backend/backend-deployment.yaml
+infrastructure/manifest/workloads/frontend/frontend-deployment.yaml
+
+# Terraform
+infrastructure/terraform/.terraform/
+infrastructure/terraform/.terraform.lock.hcl
+infrastructure/terraform/tfplan
+infrastructure/terraform/tfplan.json
+infrastructure/terraform/*.tfstate
+infrastructure/terraform/*.tfstate.*
+infrastructure/terraform/.terraform.tfstate.lock.info
+

@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: snake-game-frontend
+  labels:
+    app: snake-game
+    component: frontend
+spec:
+  type: ClusterIP  # Use ClusterIP if you have an ingress controller
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: snake-game
+    component: frontend
+

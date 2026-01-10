@@ -160,6 +160,41 @@ Module_2_End_to_End_Application/
 - ✅ Docker Compose setup
 - ✅ Comprehensive test coverage
 
+## CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment.
+
+### Workflows
+
+1. **Deploy Workflow** (`.github/workflows/deploy.yml`)
+   - Runs tests on every push/PR
+   - Builds and pushes Docker images to GCP Artifact Registry
+   - Deploys to GKE on `main` and `develop` branches
+
+2. **Terraform Workflow** (`.github/workflows/terraform.yml`)
+   - Validates Terraform configuration
+   - Plans infrastructure changes on PRs
+   - Applies infrastructure changes on `main` branch
+
+### Setup
+
+1. Create a GCP Service Account with necessary permissions
+2. Add the service account key as `GCP_SA_KEY` secret in GitHub
+3. See [.github/workflows/README.md](.github/workflows/README.md) for detailed setup instructions
+
+### Manual Deployment
+
+You can also deploy manually using the provided script:
+
+```bash
+./deploy.sh
+```
+
+This script:
+- Deploys infrastructure with Terraform
+- Builds and pushes Docker images
+- Deploys to Kubernetes
+
 ## API Documentation
 
 When the backend is running, visit:

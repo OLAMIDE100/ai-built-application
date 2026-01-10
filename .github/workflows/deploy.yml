@@ -1,0 +1,290 @@
+name: Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+
+env:
+  PROJECT_ID: nabuminds-test
+  GKE_CLUSTER: general-cluster
+  GKE_REGION: europe-west3
+  GKE_NAMESPACE: snake-game
+  REPOSITORY: snake-game
+
+jobs:
+  backend-test:
+    name: Run Backend Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          pytest tests/ -v
+
+  frontend-test:
+    name: Run Frontend Tests
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: ./frontend
+        run: npm test -- --run
+
+  integration-test:
+    name: Run Integration Tests
+    runs-on: ubuntu-latest
+    needs: backend-test, frontend-test
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9'
+
+      - name: Install Python dependencies
+        working-directory: ./backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run backend tests
+        working-directory: ./backend
+        run: |
+          pytest tests_integration/ -v
+
+
+  terraform-validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v3'
+        with:
+          service_account: 'terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/563370139005/locations/global/workloadIdentityPools/bitbucket/providers/repository'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Validate
+        run: |
+          terraform init
+          terraform validate
+          terraform fmt -check
+
+  terraform-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: terraform-validate
+    if: github.event_name == 'pull_request'
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v3'
+        with:
+          service_account: 'terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/563370139005/locations/global/workloadIdentityPools/bitbucket/providers/repository'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: |
+          terraform init
+          terraform plan -out=tfplan
+          terraform show -json tfplan > tfplan.json
+
+      - name: Run Conftest
+        uses: open-policy-agent/conftest-action@v1
+        with:
+          files: infrastructure/terraform/tfplan.json
+          policy: policy/terraform.rego
+
+
+
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v3'
+        with:
+          service_account: 'terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/563370139005/locations/global/workloadIdentityPools/bitbucket/providers/repository'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Terraform Init
+        run: |
+          export TF_VAR_snake_game_db_password=$(gcloud secrets versions access latest --secret="snake-game"  --project $PROJECT_ID | jq -r ".\"postgres-password\"" )
+          terraform init
+          terraform plan 
+          terraform apply -auto-approve 
+
+  
+  deploy:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v3'
+        with:
+          service_account: 'terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/563370139005/locations/global/workloadIdentityPools/bitbucket/providers/repository'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure kubectl
+        run: |
+          gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
+            --region ${{ env.GKE_REGION }} \
+            --project ${{ env.PROJECT_ID }}
+
+      - name: Generate image tag
+        id: meta
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            TAG=$(date +%Y%m%d%H%M%S)
+          else
+            TAG=$(date +%Y%m%d%H%M%S)-$(echo ${{ github.ref }} | sed 's/refs\/heads\///' | sed 's/\//-/g')
+          fi
+          export TF_VAR_image_tag=$TAG
+
+      - name: Create namespace if not exists
+        run: |
+          kubectl create namespace ${{ env.GKE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Deploy secrets
+        run: |
+          kubectl apply -f infrastructure/manifest/secrets/secrets.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy network resources
+        run: |
+          kubectl apply -f infrastructure/manifest/network/managed-cert.yaml -n ${{ env.GKE_NAMESPACE }}
+          kubectl apply -f infrastructure/manifest/network/ingress.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy backend configmap
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/backend/configmap.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy backend service
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/backend/backend-service.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy backend deployment
+        run: |
+          export TF_VAR_image_tag=${{ steps.meta.outputs.tag }}
+          export DATABASE_HOST=$(gcloud sql instances describe general-cluster --project nabuminds-test  --format='value(ipAddresses.[0].ipAddress)')
+          envsubst < infrastructure/manifest/workloads/backend/pre-backend-deployment.yaml > infrastructure/manifest/workloads/backend/backend-deployment.yaml
+          kubectl apply -f infrastructure/manifest/workloads/backend/backend-deployment.yaml -n ${{ env.GKE_NAMESPACE }}
+          rm -f infrastructure/manifest/workloads/backend/backend-deployment.yaml
+
+      - name: Deploy frontend service
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/frontend/frontend-service.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy frontend deployment
+        run: |
+          export TF_VAR_image_tag=${{ steps.meta.outputs.tag }}
+          envsubst < infrastructure/manifest/workloads/frontend/pre-frontend-deployment.yaml > infrastructure/manifest/workloads/frontend/frontend-deployment.yaml
+          kubectl apply -f infrastructure/manifest/workloads/frontend/frontend-deployment.yaml -n ${{ env.GKE_NAMESPACE }}
+          rm -f infrastructure/manifest/workloads/frontend/frontend-deployment.yaml
+
+      - name: Wait for backend rollout
+        run: |
+          kubectl rollout status deployment/snake-game-backend -n ${{ env.GKE_NAMESPACE }} --timeout=5m
+
+      - name: Wait for frontend rollout
+        run: |
+          kubectl rollout status deployment/snake-game-frontend -n ${{ env.GKE_NAMESPACE }} --timeout=5m
+
+      - name: Verify deployment
+        run: |
+          echo "Backend pods:"
+          kubectl get pods -n ${{ env.GKE_NAMESPACE }} -l app=snake-game,component=backend
+          echo "Frontend pods:"
+          kubectl get pods -n ${{ env.GKE_NAMESPACE }} -l app=snake-game,component=frontend
+          echo "Services:"
+          kubectl get svc -n ${{ env.GKE_NAMESPACE }}
+          echo "Ingress:"
+          kubectl get ingress -n ${{ env.GKE_NAMESPACE }}
+

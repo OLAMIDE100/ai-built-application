@@ -56,6 +56,7 @@ const apiRequest = async (endpoint, options = {}) => {
     if (contentType && contentType.includes('application/json')) {
       try {
         data = await response.json();
+        console.log('Parsed JSON response:', data);
       } catch (jsonError) {
         console.error('Failed to parse JSON response:', jsonError);
         return {
@@ -66,6 +67,17 @@ const apiRequest = async (endpoint, options = {}) => {
     } else {
       // If not JSON, try to get text
       const text = await response.text();
+      console.log('Non-JSON response text:', text);
+      
+      // Check if we got HTML instead of JSON (this means request hit frontend instead of backend)
+      if (text && text.trim().startsWith('<!doctype html>') || text.includes('<html')) {
+        console.error('Received HTML instead of JSON - request may have hit frontend instead of backend');
+        return {
+          success: false,
+          error: 'API request was routed incorrectly. Please check ingress configuration.'
+        };
+      }
+      
       data = text ? { detail: text } : {};
     }
     
@@ -84,6 +96,22 @@ const apiRequest = async (endpoint, options = {}) => {
         errorMessage = `Request failed with status ${response.status}`;
       }
       return { success: false, error: errorMessage };
+    }
+    
+    // Check if we got HTML in a successful response (shouldn't happen, but handle it)
+    if (data && typeof data.detail === 'string' && data.detail.includes('<!doctype html>')) {
+      console.error('Received HTML in successful response - ingress routing issue');
+      return {
+        success: false,
+        error: 'API request was routed incorrectly. Please check ingress configuration.'
+      };
+    }
+    
+    // For successful responses, ensure success field exists if backend doesn't provide it
+    // Some endpoints return data directly without a success wrapper
+    if (response.ok && data && !data.hasOwnProperty('success')) {
+      // If response is ok but no success field, assume success
+      data.success = true;
     }
     
     return data;
@@ -139,19 +167,21 @@ export const api = {
       body: JSON.stringify({ username, email, password }),
     });
     
-    if (response.success && response.token) {
-      setToken(response.token);
+    console.log('Signup response:', response);
+    
+    // Handle successful signup response
+    if (response && response.success) {
+      if (response.token) {
+        setToken(response.token);
+      }
       // Store user info in localStorage for quick access
       if (response.user) {
         localStorage.setItem('currentUser', JSON.stringify(response.user));
       }
-    } else if (response.success) {
-      // If no token in response, still store user (for backward compatibility)
-      if (response.user) {
-        localStorage.setItem('currentUser', JSON.stringify(response.user));
-      }
+      return response;
     }
     
+    // If response doesn't have success field or success is false
     return response;
   },
 

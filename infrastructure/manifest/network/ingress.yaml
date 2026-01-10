@@ -1,0 +1,37 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: snake-game
+  labels:
+    app: snake-game
+  annotations:
+    kubernetes.io/ingress.allow-http: "false"
+    kubernetes.io/ingress.global-static-ip-name: snake-game-domian-address
+    networking.gke.io/managed-certificates: snake-game-subdomian-cert
+spec:
+  defaultBackend:
+    service:
+      name: snake-game-frontend
+      port:
+        number: 3000
+  rules:
+  - host: snake-game.nabuminds-test.app  # Change to your domain
+    http:
+      paths:
+      # Backend API routes - must come BEFORE frontend routes
+      # PathType: Prefix matches /api and all subpaths like /api/v1/auth/signup
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: snake-game-backend
+            port:
+              number: 8001
+      # Frontend routes - catch all other paths (must be last)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: snake-game-frontend
+            port:
+              number: 3000

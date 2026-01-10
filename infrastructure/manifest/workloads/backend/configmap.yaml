@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: snake-game
+  labels:
+    app: snake-game
+data:
+  algorithm: "HS256"
+

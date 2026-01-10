@@ -9,11 +9,28 @@ from app.db_models import Base
 import os
 from typing import Generator
 
-# Get database URL from environment variable, default to SQLite
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "sqlite:///./snake_game.db"  # Default to SQLite for development
-)
+# Get database configuration from environment variables
+# Support both individual variables and DATABASE_URL for backward compatibility
+def get_database_url():
+    """Construct DATABASE_URL from individual environment variables or use DATABASE_URL if provided"""
+    # If DATABASE_URL is explicitly set, use it (for backward compatibility)
+    if os.getenv("DATABASE_URL"):
+        return os.getenv("DATABASE_URL")
+    
+    # Otherwise, construct from individual variables
+    db_user = os.getenv("POSTGRES_USER")
+    db_password = os.getenv("POSTGRES_PASSWORD")
+    db_host = os.getenv("POSTGRES_HOST")
+    db_name = os.getenv("POSTGRES_DB")
+    
+    # If any PostgreSQL variable is missing, default to SQLite
+    if not all([db_user, db_password, db_host, db_name]):
+        return "sqlite:///./snake_game.db"
+    
+    # Construct PostgreSQL URL
+    return f"postgresql://{db_user}:{db_password}@{db_host}:5432/{db_name}"
+
+DATABASE_URL = get_database_url()
 
 # Determine if we're using SQLite
 IS_SQLITE = DATABASE_URL.startswith("sqlite")
