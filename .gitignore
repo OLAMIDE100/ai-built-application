@@ -47,4 +47,6 @@ infrastructure/terraform/tfplan.json
 infrastructure/terraform/*.tfstate
 infrastructure/terraform/*.tfstate.*
 infrastructure/terraform/.terraform.tfstate.lock.info
-
+set_env_test.sh
+setup.sh
+deploy.sh
