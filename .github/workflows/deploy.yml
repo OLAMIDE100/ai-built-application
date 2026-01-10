@@ -121,9 +121,9 @@ jobs:
 
       - name: Terraform Validate
         run: |
-          echo "yes" | terraform init \
-          echo "yes" | terraform validate \
-          echo "yes" | terraform fmt -check \
+          echo "yes" | terraform init &&
+          echo "yes" | terraform validate &&
+          echo "yes" | terraform fmt -check &&
 
   terraform-plan:
     name: Terraform Plan
