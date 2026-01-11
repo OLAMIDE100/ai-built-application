@@ -153,6 +153,11 @@ jobs:
         with:
           terraform_version: 1.5.0
 
+      - name: Install conftest
+        run: |
+          wget -O - 'https://github.com/open-policy-agent/conftest/releases/download/v${{ env.CONFTEST_VERSION }}/conftest_${{ env.CONFTEST_VERSION }}_Linux_x86_64.tar.gz' | tar zxvf - 
+          ./conftest --version 
+
       - name: Terraform Init
         run: |
           echo "yes" | terraform init 
@@ -161,12 +166,8 @@ jobs:
           ls
 
       - name: Run Conftest
-        uses: instrumenta/conftest-action@master
-        with:
-          files: infrastructure/terraform/tfplan.json
-          policy: policy/terraform.rego
-          namespace: infrastructure/terraform
-
+        run: |
+          ./conftest test --policy policy infrastructure/terraform/tfplan.json --all-namespaces  
 
 
   terraform-apply:
