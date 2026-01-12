@@ -164,8 +164,8 @@ jobs:
       - name: Run Conftest
         uses: instrumenta/conftest-action@master
         with:
-          files: tfplan.json
-          policy: ../../policy/terraform.rego
+          files: infrastructure/terraform/tfplan.json
+          policy: policy/terraform.rego
           namespace: infrastructure/terraform 
 
 
