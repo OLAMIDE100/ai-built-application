@@ -27,12 +27,14 @@ export default function Signup({ onSignup, onSwitchToLogin }) {
 
     try {
       const result = await api.signup(username, email, password);
-      if (result.success) {
+      console.log('Signup result:', result);
+      if (result && result.success) {
         onSignup(result.user);
       } else {
-        setError(result.error || 'Signup failed');
+        setError(result?.error || 'Signup failed');
       }
     } catch (err) {
+      console.error('Signup error:', err);
       setError('An error occurred during signup');
     } finally {
       setLoading(false);

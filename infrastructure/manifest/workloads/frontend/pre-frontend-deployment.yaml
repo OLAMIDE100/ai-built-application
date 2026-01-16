@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snake-game-frontend
+  labels:
+    app: snake-game
+    component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snake-game
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: snake-game
+        component: frontend
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: snake-game-pool
+      tolerations:
+      - effect: NoSchedule
+        key: gke-instance
+        operator: Equal
+        value: snake-game
+      containers:
+      - name: frontend
+        image: europe-west3-docker.pkg.dev/nabuminds-test/snake-game/frontend-image:${TF_VAR_image_tag}  # Update with your image registry
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+          name: http
+          protocol: TCP
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      restartPolicy: Always
+

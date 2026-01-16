@@ -23,8 +23,11 @@ export default function SnakeGame({
   const [food, setFood] = useState(() => randomFood(INITIAL_SNAKE));
   const [gameOver, setGameOver] = useState(false);
   const [score, setScore] = useState(0);
-  const [mode, setMode] = useState(initialMode);
+  const [mode, setMode] = useState(null);
   const [gameStarted, setGameStarted] = useState(false);
+  const [paused, setPaused] = useState(false);
+  const [showModeSelection, setShowModeSelection] = useState(true);
+  const scoreSubmittedRef = useRef(false);
 
   const directionRef = useRef(direction);
   directionRef.current = direction;
@@ -46,7 +49,7 @@ export default function SnakeGame({
   }, [controlled]);
 
   useEffect(() => {
-    if (gameOver || !gameStarted) return;
+    if (gameOver || !gameStarted || paused) return;
 
     const interval = setInterval(() => {
       setSnake(prev => {
@@ -56,9 +59,6 @@ export default function SnakeGame({
           setGameOver(true);
           if (onGameOver) {
             onGameOver(score);
-          }
-          if (onScoreSubmit && score > 0) {
-            onScoreSubmit(score, mode);
           }
           return prev;
         }
@@ -73,7 +73,15 @@ export default function SnakeGame({
     }, 120);
 
     return () => clearInterval(interval);
-  }, [food, gameOver, mode, gameStarted, currentDirection, onGameOver, onScoreSubmit, score]);
+  }, [food, gameOver, mode, gameStarted, paused, currentDirection, onGameOver]);
+
+  // Submit score only once when game ends
+  useEffect(() => {
+    if (gameOver && onScoreSubmit && score > 0 && !scoreSubmittedRef.current) {
+      scoreSubmittedRef.current = true;
+      onScoreSubmit(score, mode);
+    }
+  }, [gameOver, score, mode, onScoreSubmit]);
 
   const resetGame = () => {
     setSnake(INITIAL_SNAKE);
@@ -82,32 +90,65 @@ export default function SnakeGame({
     setGameOver(false);
     setScore(0);
     setGameStarted(false);
+    setPaused(false);
+    setMode(null);
+    setShowModeSelection(true);
+    scoreSubmittedRef.current = false; // Reset score submission flag
   };
 
   const playAgain = () => {
+    if (!mode) {
+      setShowModeSelection(true);
+      return;
+    }
     setSnake(INITIAL_SNAKE);
     setDirection({ x: 1, y: 0 });
     setFood(randomFood(INITIAL_SNAKE));
     setGameOver(false);
     setScore(0);
     setGameStarted(true);
+    setPaused(false);
+    setShowModeSelection(false);
+    scoreSubmittedRef.current = false; // Reset score submission flag
   };
 
-  const startGame = () => {
-    setGameStarted(true);
-    setGameOver(false);
+  const handleModeSelect = (selectedMode) => {
+    setMode(selectedMode);
+    setShowModeSelection(false);
+  };
+
+  const toggleGame = () => {
+    if (!gameStarted) {
+      // Check if mode is selected
+      if (!mode) {
+        setShowModeSelection(true);
+        return;
+      }
+      // Start the game
+      setGameStarted(true);
+      setGameOver(false);
+      setPaused(false);
+    } else if (paused) {
+      // Resume the game
+      setPaused(false);
+    } else {
+      // Pause the game
+      setPaused(true);
+    }
   };
 
   return (
     <div className="flex flex-col items-center gap-4 mt-10 relative">
       <h1 className="text-3xl font-bold">{title}</h1>
 
-      <div className="flex gap-2 items-center">
-        <span className="text-sm font-medium">Game Mode:</span>
-        <span className="text-sm font-semibold text-blue-600">
-          {mode === "wall" ? "Wall Mode" : "Pass Through Mode"}
-        </span>
-      </div>
+      {mode && (
+        <div className="flex gap-2 items-center">
+          <span className="text-sm font-medium">Game Mode:</span>
+          <span className="text-sm font-semibold text-blue-600">
+            {mode === "wall" ? "Wall Mode" : "Pass Through Mode"}
+          </span>
+        </div>
+      )}
 
       <div
         className="relative bg-gray-900"
@@ -145,17 +186,24 @@ export default function SnakeGame({
       </div>
 
       <div className="text-lg">Score: {score}</div>
+      {paused && gameStarted && (
+        <div className="text-lg font-semibold text-yellow-600">PAUSED</div>
+      )}
 
       {showControls && (
         <div className="flex gap-3 items-center">
-          {!gameStarted && (
-            <button
-              onClick={startGame}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
-            >
-              Start
-            </button>
-          )}
+          <button
+            onClick={toggleGame}
+            className={`px-4 py-2 text-white rounded hover:opacity-90 ${
+              !gameStarted
+                ? 'bg-green-600 hover:bg-green-700'
+                : paused
+                ? 'bg-blue-600 hover:bg-blue-700'
+                : 'bg-yellow-600 hover:bg-yellow-700'
+            }`}
+          >
+            {!gameStarted ? 'Start' : paused ? 'Resume' : 'Pause'}
+          </button>
           {gameStarted && (
             <button
               onClick={resetGame}
@@ -165,6 +213,44 @@ export default function SnakeGame({
             </button>
           )}
         </div>
+      )}
+
+      {/* Mode Selection Modal - Before Game Starts */}
+      {showModeSelection && !gameStarted && showControls && (
+        <>
+          {/* Backdrop overlay */}
+          <div className="fixed inset-0 bg-black bg-opacity-50 z-40" />
+          
+          {/* Modal popup */}
+          <div className="fixed inset-0 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4 flex flex-col items-center gap-4">
+              <h2 className="text-2xl font-bold text-gray-800">Select Game Mode</h2>
+              <p className="text-gray-600 text-center">Choose your preferred game mode to begin playing</p>
+              
+              <div className="flex flex-col gap-3 w-full">
+                <button
+                  onClick={() => handleModeSelect('wall')}
+                  className="px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg transition-colors w-full"
+                >
+                  Wall Mode
+                </button>
+                <button
+                  onClick={() => handleModeSelect('pass')}
+                  className="px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold text-lg transition-colors w-full"
+                >
+                  Pass Through Mode
+                </button>
+              </div>
+              
+              <div className="text-sm text-gray-500 text-center mt-2">
+                <p className="font-semibold mb-1">Wall Mode:</p>
+                <p>Game ends when snake hits the walls</p>
+                <p className="font-semibold mt-3 mb-1">Pass Through Mode:</p>
+                <p>Snake wraps around the edges</p>
+              </div>
+            </div>
+          </div>
+        </>
       )}
 
       {gameOver && showControls && (
@@ -184,10 +270,11 @@ export default function SnakeGame({
                 </label>
                 <select
                   id="mode-select-popup"
-                  value={mode}
+                  value={mode || ''}
                   onChange={(e) => setMode(e.target.value)}
                   className="px-4 py-2 rounded bg-white border-2 border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full text-center"
                 >
+                  <option value="">Select Mode</option>
                   <option value="wall">Wall Mode</option>
                   <option value="pass">Pass Through Mode</option>
                 </select>
@@ -195,7 +282,13 @@ export default function SnakeGame({
 
               <div className="flex flex-col gap-3 w-full">
                 <button
-                  onClick={playAgain}
+                  onClick={() => {
+                    if (!mode) {
+                      alert('Please select a game mode');
+                      return;
+                    }
+                    playAgain();
+                  }}
                   className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold text-lg transition-colors w-full"
                 >
                   Play Again

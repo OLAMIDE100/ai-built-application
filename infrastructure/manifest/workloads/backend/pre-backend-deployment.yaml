@@ -1,0 +1,141 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: snake-game-backend
+  labels:
+    app: snake-game
+    component: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: snake-game
+      component: backend
+  template:
+    metadata:
+      labels:
+        app: snake-game
+        component: backend
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-nodepool: snake-game-pool
+      tolerations:
+      - effect: NoSchedule
+        key: gke-instance
+        operator: Equal
+        value: snake-game
+      initContainers:
+      - name: wait-for-db
+        image: europe-west3-docker.pkg.dev/nabuminds-test/snake-game/backend-image:${TF_VAR_image_tag}  # Update with your image registry
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'python wait-for-db.py']
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-password
+        - name: POSTGRES_HOST
+          value: ${DATABASE_HOST}
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-db
+      - name: init-db
+        image: europe-west3-docker.pkg.dev/nabuminds-test/snake-game/backend-image:${TF_VAR_image_tag}  # Update with your image registry
+        imagePullPolicy: IfNotPresent
+        command: ['sh', '-c', 'python init_db.py']
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-password
+        - name: POSTGRES_HOST
+          value: ${DATABASE_HOST}
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-db
+      containers:
+      - name: backend
+        image: europe-west3-docker.pkg.dev/nabuminds-test/snake-game/backend-image:${TF_VAR_image_tag}  # Update with your image registry
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8001
+          name: http
+          protocol: TCP
+        command: ['uvicorn', 'app.main:app', '--host', '0.0.0.0', '--port', '8001']
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-user
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-password
+        - name: POSTGRES_HOST
+          value: ${DATABASE_HOST}
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: postgres-db
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: snake-game
+              key: secret-key
+        - name: ALGORITHM
+          valueFrom:
+            configMapKeyRef:
+              name: snake-game
+              key: algorithm
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 40
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 0
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 12
+      restartPolicy: Always
+

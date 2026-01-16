@@ -1,124 +1,274 @@
-// Centralized backend API mock service
-// All backend calls should go through this service
+// Centralized backend API service
+// All backend calls go through this service
+// Uses the FastAPI backend at http://localhost:8000/api/v1
 
-// Mock storage (simulating a backend)
-let mockUsers = [
-  { id: 1, username: 'player1', email: 'player1@example.com', password: 'password123' },
-  { id: 2, username: 'player2', email: 'player2@example.com', password: 'password123' },
-];
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8001/api/v1';
 
-let mockScores = [
-  { id: 1, userId: 1, username: 'player1', score: 150, mode: 'wall', timestamp: Date.now() - 3600000 },
-  { id: 2, userId: 2, username: 'player2', score: 120, mode: 'pass', timestamp: Date.now() - 7200000 },
-  { id: 3, userId: 1, username: 'player1', score: 200, mode: 'wall', timestamp: Date.now() - 1800000 },
-];
+// Token storage key
+const TOKEN_KEY = 'authToken';
 
-let currentUser = null;
+// Helper to get auth token from localStorage
+const getToken = () => {
+  return localStorage.getItem(TOKEN_KEY);
+};
 
-// Simulate network delay
-const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
+// Helper to set auth token in localStorage
+const setToken = (token) => {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+};
+
+// Helper to make API requests
+const apiRequest = async (endpoint, options = {}) => {
+  // Normalize URL construction - remove leading slash from endpoint if present
+  const normalizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  // Ensure API_BASE_URL doesn't end with a slash
+  const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+  const url = `${baseUrl}${normalizedEndpoint}`;
+  const token = getToken();
+  
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
+  
+  // Add authorization header if token exists
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+  
+  const config = {
+    ...options,
+    headers,
+  };
+  
+  try {
+    console.log('Making API request to:', url);
+    const response = await fetch(url, config);
+    console.log('Response status:', response.status, response.statusText);
+    
+    // Try to parse JSON, but handle cases where response might not be JSON
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+        console.log('Parsed JSON response:', data);
+      } catch (jsonError) {
+        console.error('Failed to parse JSON response:', jsonError);
+        return {
+          success: false,
+          error: `Invalid JSON response from server (status ${response.status})`
+        };
+      }
+    } else {
+      // If not JSON, try to get text
+      const text = await response.text();
+      console.log('Non-JSON response text:', text);
+      
+      // Check if we got HTML instead of JSON (this means request hit frontend instead of backend)
+      if (text && text.trim().startsWith('<!doctype html>') || text.includes('<html')) {
+        console.error('Received HTML instead of JSON - request may have hit frontend instead of backend');
+        return {
+          success: false,
+          error: 'API request was routed incorrectly. Please check ingress configuration.'
+        };
+      }
+      
+      data = text ? { detail: text } : {};
+    }
+    
+    // Handle non-2xx responses
+    if (!response.ok) {
+      // FastAPI returns errors in 'detail' field, but some endpoints may use 'error'
+      // Also handle case where data might be a string
+      let errorMessage;
+      if (typeof data === 'string') {
+        errorMessage = data;
+      } else if (data.detail) {
+        errorMessage = data.detail;
+      } else if (data.error) {
+        errorMessage = data.error;
+      } else {
+        errorMessage = `Request failed with status ${response.status}`;
+      }
+      return { success: false, error: errorMessage };
+    }
+    
+    // Check if we got HTML in a successful response (shouldn't happen, but handle it)
+    if (data && typeof data.detail === 'string' && data.detail.includes('<!doctype html>')) {
+      console.error('Received HTML in successful response - ingress routing issue');
+      return {
+        success: false,
+        error: 'API request was routed incorrectly. Please check ingress configuration.'
+      };
+    }
+    
+    // For successful responses, ensure success field exists if backend doesn't provide it
+    // Some endpoints return data directly without a success wrapper
+    if (response.ok && data && !data.hasOwnProperty('success')) {
+      // If response is ok but no success field, assume success
+      data.success = true;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('API request failed:', error);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      url: url
+    });
+    // Handle different types of errors
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      return { 
+        success: false, 
+        error: 'Network error. Please check if the backend server is running at ' + API_BASE_URL + '. Make sure the backend is running on port 8001.'
+      };
+    }
+    return { 
+      success: false, 
+      error: error.message || 'Network error. Please check if the backend server is running.' 
+    };
+  }
+};
 
 export const api = {
   // Authentication
   async login(email, password) {
-    await delay();
-    const user = mockUsers.find(u => u.email === email && u.password === password);
-    if (user) {
-      currentUser = { ...user };
-      delete currentUser.password;
-      return { success: true, user: currentUser };
+    const response = await apiRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    
+    if (response.success && response.token) {
+      setToken(response.token);
+      // Store user info in localStorage for quick access
+      if (response.user) {
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+      }
+    } else if (response.success) {
+      // If no token in response, still store user (for backward compatibility)
+      if (response.user) {
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+      }
     }
-    return { success: false, error: 'Invalid email or password' };
+    
+    return response;
   },
 
   async signup(username, email, password) {
-    await delay();
-    if (mockUsers.find(u => u.email === email)) {
-      return { success: false, error: 'Email already exists' };
+    const response = await apiRequest('/auth/signup', {
+      method: 'POST',
+      body: JSON.stringify({ username, email, password }),
+    });
+    
+    console.log('Signup response:', response);
+    
+    // Handle successful signup response
+    if (response && response.success) {
+      if (response.token) {
+        setToken(response.token);
+      }
+      // Store user info in localStorage for quick access
+      if (response.user) {
+        localStorage.setItem('currentUser', JSON.stringify(response.user));
+      }
+      return response;
     }
-    if (mockUsers.find(u => u.username === username)) {
-      return { success: false, error: 'Username already exists' };
-    }
-    const newUser = {
-      id: mockUsers.length + 1,
-      username,
-      email,
-      password,
-    };
-    mockUsers.push(newUser);
-    currentUser = { ...newUser };
-    delete currentUser.password;
-    return { success: true, user: currentUser };
+    
+    // If response doesn't have success field or success is false
+    return response;
   },
 
   async logout() {
-    await delay(100);
-    currentUser = null;
-    return { success: true };
+    const response = await apiRequest('/auth/logout', {
+      method: 'POST',
+    });
+    
+    // Clear token and user info regardless of response
+    setToken(null);
+    localStorage.removeItem('currentUser');
+    
+    return response;
   },
 
   async getCurrentUser() {
-    await delay(100);
-    return currentUser;
+    const token = getToken();
+    if (!token) {
+      // Check localStorage for cached user
+      const cachedUser = localStorage.getItem('currentUser');
+      return cachedUser ? JSON.parse(cachedUser) : null;
+    }
+    
+    const response = await apiRequest('/auth/me', {
+      method: 'GET',
+    });
+    
+    // /auth/me returns User object directly (not wrapped in success/error)
+    if (response.success === false) {
+      // Request failed, clear token and cached user
+      setToken(null);
+      localStorage.removeItem('currentUser');
+      return null;
+    }
+    
+    // Response is a User object (has id, username, email)
+    if (response.id) {
+      // Update cached user
+      localStorage.setItem('currentUser', JSON.stringify(response));
+      return response;
+    }
+    
+    // If no user data, try to use cached user
+    const cachedUser = localStorage.getItem('currentUser');
+    return cachedUser ? JSON.parse(cachedUser) : null;
   },
 
   // Leaderboard
-  async getLeaderboard(limit = 10) {
-    await delay();
-    const sorted = [...mockScores]
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
-      .map((score, index) => ({ ...score, rank: index + 1 }));
-    return { success: true, leaderboard: sorted };
+  async getLeaderboard(limit = 10, mode = null) {
+    let endpoint = `/leaderboard?limit=${limit}`;
+    if (mode) {
+      endpoint += `&mode=${mode}`;
+    }
+    
+    const response = await apiRequest(endpoint, {
+      method: 'GET',
+    });
+    
+    return response;
   },
 
   async submitScore(score, mode) {
-    await delay();
-    if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+    const token = getToken();
+    if (!token) {
+      return { success: false, error: 'Not authenticated. Please log in.' };
     }
-    const newScore = {
-      id: mockScores.length + 1,
-      userId: currentUser.id,
-      username: currentUser.username,
-      score,
-      mode,
-      timestamp: Date.now(),
-    };
-    mockScores.push(newScore);
-    return { success: true, score: newScore };
+    
+    const response = await apiRequest('/scores', {
+      method: 'POST',
+      body: JSON.stringify({ score, mode }),
+    });
+    
+    return response;
   },
 
-  // Watching other players
+  // Active Players
   async getActivePlayers() {
-    await delay();
-    // Return mock active players
-    return {
-      success: true,
-      players: [
-        { id: 1, username: 'player1', score: 45, mode: 'wall' },
-        { id: 2, username: 'player2', score: 32, mode: 'pass' },
-        { id: 3, username: 'player3', score: 67, mode: 'wall' },
-      ],
-    };
+    const response = await apiRequest('/players/active', {
+      method: 'GET',
+    });
+    
+    return response;
   },
 
-  async watchPlayer(playerId) {
-    await delay();
-    // Return mock player game state
-    return {
-      success: true,
-      player: {
-        id: playerId,
-        username: `player${playerId}`,
-        gameState: {
-          snake: [{ x: 5, y: 5 }, { x: 4, y: 5 }],
-          food: { x: 10, y: 10 },
-          score: 15,
-          mode: 'wall',
-        },
-      },
-    };
+  // Reset function for testing (kept for backward compatibility)
+  reset() {
+    setToken(null);
+    localStorage.removeItem('currentUser');
   },
 };
-

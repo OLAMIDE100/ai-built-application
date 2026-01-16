@@ -27,6 +27,7 @@ A classic Snake game built with React 19 and Vite, featuring two game modes, gri
 
 - Node.js (v16 or higher)
 - npm or yarn
+- Backend server running (see backend README for setup)
 
 ### Installation
 
@@ -35,9 +36,27 @@ A classic Snake game built with React 19 and Vite, featuring two game modes, gri
 npm install
 ```
 
+### Backend Connection
+
+The frontend connects to the FastAPI backend. By default, it expects the backend at:
+- `http://localhost:8000/api/v1`
+
+To change the backend URL, create a `.env` file in the frontend directory:
+```bash
+VITE_API_BASE_URL=http://localhost:8000/api/v1
+```
+
+**Important**: Make sure the backend server is running before starting the frontend:
+```bash
+# In the backend directory
+cd ../backend
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+```
+
 ### Development
 
-Run the development server:
+1. Start the backend server (see above)
+2. Run the frontend development server:
 ```bash
 npm run dev
 ```
