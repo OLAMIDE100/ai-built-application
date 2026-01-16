@@ -410,7 +410,7 @@ Example: Commit `a1b2c3d4e5f6...` produces image tag `a1b2c3d`
 
 The workflows use **Workload Identity Federation** for authentication:
 
-1. Service Account: `terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com`
+1. Service Account: ``
 2. Workload Identity Provider: Configured for GitHub Actions
 3. No secrets required - authentication is handled via Workload Identity
 
