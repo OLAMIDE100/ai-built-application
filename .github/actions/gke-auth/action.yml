@@ -14,11 +14,13 @@ runs:
       uses: google-github-actions/setup-gcloud@v2
 
     - name: Configure kubectl
+      shell: bash
       run: |
         gcloud components install gke-gcloud-auth-plugin
         gcloud container clusters get-credentials general-cluster --region europe-west3 --project nabuminds-test
 
 
     - name: Create namespace if not exists
+      shell: bash
       run: |
         kubectl create namespace snake-game --dry-run=client -o yaml | kubectl apply -f -
