@@ -1,14 +1,4 @@
 
-env:
-  PROJECT_ID: nabuminds-test
-  GKE_CLUSTER: general-cluster
-  GKE_REGION: europe-west3
-  GKE_NAMESPACE: snake-game
-  REPOSITORY: snake-game
-
-
-
-
 
 name: Google-cloud and GKE authentication
 runs:
@@ -26,11 +16,9 @@ runs:
     - name: Configure kubectl
       run: |
         gcloud components install gke-gcloud-auth-plugin
-        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
-          --region ${{ env.GKE_REGION }} \
-          --project ${{ env.PROJECT_ID }}
+        gcloud container clusters get-credentials general-cluster --region europe-west3 --project nabuminds-test
 
 
     - name: Create namespace if not exists
       run: |
-        kubectl create namespace ${{ env.GKE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+        kubectl create namespace snake-game --dry-run=client -o yaml | kubectl apply -f -
