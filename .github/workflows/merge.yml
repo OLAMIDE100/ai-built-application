@@ -1,0 +1,221 @@
+name: Deploy to GKE
+
+on:
+  push:
+    branches:
+      - main
+
+
+env:
+  PROJECT_ID: nabuminds-test
+  GKE_CLUSTER: general-cluster
+  GKE_REGION: europe-west3
+  GKE_NAMESPACE: snake-game
+  REPOSITORY: snake-game
+
+jobs:
+################################################################################################### TERRAFORM APPLY JOBS ########################################################################################################
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    outputs:
+      image_tag: ${{ steps.tag.outputs.tag }}
+    environment:
+      name: production
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    defaults:
+      run:
+        working-directory: ./infrastructure/terraform
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: 'google-github-actions/auth@v3'
+        with:
+          service_account: 'terraform-test-deployment@nabuminds-test.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/563370139005/locations/global/workloadIdentityPools/bitbucket/providers/repository'
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.5.0
+
+      - name: Generate image tag
+        id: tag
+        run: |
+          # Use commit SHA (short version - first 7 characters)
+          TAG=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Using commit SHA: ${{ github.sha }}"
+          echo "Image tag: $TAG"
+
+      - name: Terraform Apply
+        run: |
+          export TF_VAR_image_tag=${{ steps.tag.outputs.tag }}
+          export TF_VAR_snake_game_db_password=$(gcloud secrets versions access latest --secret="snake-game"  --project $PROJECT_ID | jq -r ".\"postgres-password\"" )   
+          echo "yes" | terraform init 
+          echo "yes" | terraform plan 
+          terraform apply -auto-approve 
+
+################################################################################################### DEPLOY  SECRETS ########################################################################################################
+  deploy-secrets:
+    name: Deploy Secrets to GKE
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud and GKE
+        uses: ./.github/action/gke-auth.yml
+ 
+
+      - name: Deploy secrets
+        run: |
+          kubectl apply -f infrastructure/manifest/secrets/secrets.yaml -n ${{ env.GKE_NAMESPACE }}
+
+################################################################################################### DEPLOY  FRONTEND JOBS ########################################################################################################
+  deploy-frontend:
+    name: Deploy to GKE
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud and GKE
+        uses: ./.github/action/gke-auth.yml
+
+
+      - name: Deploy frontend service
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/frontend/frontend-service.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy frontend deployment
+        run: |
+          export TF_VAR_image_tag=${{ needs.terraform-apply.outputs.image_tag }}
+          envsubst < infrastructure/manifest/workloads/frontend/pre-frontend-deployment.yaml > infrastructure/manifest/workloads/frontend/frontend-deployment.yaml
+          kubectl apply -f infrastructure/manifest/workloads/frontend/frontend-deployment.yaml -n ${{ env.GKE_NAMESPACE }}
+          rm -f infrastructure/manifest/workloads/frontend/frontend-deployment.yaml
+
+
+
+      - name: Wait for frontend rollout
+        run: |
+          kubectl rollout status deployment/snake-game-frontend -n ${{ env.GKE_NAMESPACE }} --timeout=5m
+
+
+################################################################################################### DEPLOY  BACKEND JOBS ########################################################################################################
+  deploy-backend:
+    name: Deploy Backend to GKE
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud and GKE
+        uses: ./.github/action/gke-auth.yml
+
+
+      - name: Deploy backend configmap
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/backend/configmap.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy backend service
+        run: |
+          kubectl apply -f infrastructure/manifest/workloads/backend/backend-service.yaml -n ${{ env.GKE_NAMESPACE }}
+
+      - name: Deploy backend deployment
+        run: |
+          export TF_VAR_image_tag=${{ needs.terraform-apply.outputs.image_tag }}
+          export DATABASE_HOST=$(gcloud sql instances describe general-cluster --project nabuminds-test  --format='value(ipAddresses.[0].ipAddress)')
+          envsubst < infrastructure/manifest/workloads/backend/pre-backend-deployment.yaml > infrastructure/manifest/workloads/backend/backend-deployment.yaml
+          kubectl apply -f infrastructure/manifest/workloads/backend/backend-deployment.yaml -n ${{ env.GKE_NAMESPACE }}
+          rm -f infrastructure/manifest/workloads/backend/backend-deployment.yaml
+
+
+
+      - name: Wait for backend rollout
+        run: |
+          kubectl rollout status deployment/snake-game-backend -n ${{ env.GKE_NAMESPACE }} --timeout=5m
+
+
+################################################################################################### DEPLOY  NETWORK RESOURCES ########################################################################################################
+  deploy-network-resources:
+    name: Deploy Network Resources to GKE
+    runs-on: ubuntu-latest
+    needs: [ deploy-frontend, deploy-backend]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud and GKE
+        uses: ./.github/action/gke-auth.yml
+
+
+
+      - name: Deploy network resources
+        run: |
+          kubectl apply -f infrastructure/manifest/network/managed-cert.yaml -n ${{ env.GKE_NAMESPACE }}
+          kubectl apply -f infrastructure/manifest/network/ingress.yaml -n ${{ env.GKE_NAMESPACE }}
+
+################################################################################################### VERIFY DEPLOYMENTS  NETWORK RESOURCES ########################################################################################################
+  verify-deployments:
+    name: Verify Deployments to GKE
+    runs-on: ubuntu-latest
+    needs: [deploy-backend, deploy-network-resources]
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: production
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud and GKE
+        uses: ./.github/action/gke-auth.yml
+      
+      - name: Verify deployments
+        run: |
+          echo "Backend pods:"
+          kubectl get pods -n ${{ env.GKE_NAMESPACE }} -l app=snake-game,component=backend
+          echo "Frontend pods:"
+          kubectl get pods -n ${{ env.GKE_NAMESPACE }} -l app=snake-game,component=frontend
+          echo "Services:"
+          kubectl get svc -n ${{ env.GKE_NAMESPACE }}
+          echo "Ingress:"
+          kubectl get ingress -n ${{ env.GKE_NAMESPACE }}
