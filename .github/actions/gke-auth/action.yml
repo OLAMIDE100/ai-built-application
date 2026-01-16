@@ -1,3 +1,15 @@
+
+env:
+  PROJECT_ID: nabuminds-test
+  GKE_CLUSTER: general-cluster
+  GKE_REGION: europe-west3
+  GKE_NAMESPACE: snake-game
+  REPOSITORY: snake-game
+
+
+
+
+
 name: Google-cloud and GKE authentication
 runs:
   using: "composite"
