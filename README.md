@@ -1,5 +1,7 @@
 # Snake Game - Multiplayer Application
 
+![Snake Game](api/snake.png)
+
 A full-stack multiplayer Snake game application with authentication, leaderboards, and real-time features.
 
 ## Architecture
