@@ -1,3 +1,5 @@
+
+
 name: Google-cloud and GKE authentication
 runs:
   using: "composite"
@@ -12,13 +14,8 @@ runs:
       uses: google-github-actions/setup-gcloud@v2
 
     - name: Configure kubectl
+      shell: bash
       run: |
         gcloud components install gke-gcloud-auth-plugin
-        gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
-          --region ${{ env.GKE_REGION }} \
-          --project ${{ env.PROJECT_ID }}
-
-
-    - name: Create namespace if not exists
-      run: |
-        kubectl create namespace ${{ env.GKE_NAMESPACE }} --dry-run=client -o yaml | kubectl apply -f -
+        gcloud container clusters get-credentials general-cluster --region europe-west3 --project nabuminds-test
+        kubectl create namespace snake-game --dry-run=client -o yaml | kubectl apply -f -
