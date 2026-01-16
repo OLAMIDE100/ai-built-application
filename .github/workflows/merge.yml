@@ -80,7 +80,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Authenticate to Google Cloud and GKE
-        uses: ./.github/action/action.yml
+        uses: ./.github/actions/gke-auth/action.yml
  
 
       - name: Deploy secrets
