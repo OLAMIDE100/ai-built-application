@@ -17,6 +17,7 @@ env:
   REPOSITORY: snake-game
 
 jobs:
+################################################################################################### BACKEND TESTING JOBS ########################################################################################################
   backend-test:
     name: Run Backend Tests
     runs-on: ubuntu-latest
@@ -41,6 +42,7 @@ jobs:
         run: |
           pytest tests/ -v
 
+################################################################################################### FRONTEND TESTING JOBS ########################################################################################################
   frontend-test:
     name: Run Frontend Tests
     runs-on: ubuntu-latest
@@ -64,6 +66,7 @@ jobs:
         working-directory: ./frontend
         run: npm test -- --run
 
+################################################################################################### INTEGRATION TESTING JOBS ########################################################################################################
   integration-test:
     name: Run Integration Tests
     runs-on: ubuntu-latest
@@ -89,7 +92,7 @@ jobs:
         run: |
           pytest tests_integration/ -v
 
-
+################################################################################################### TERRAFORM VALIDATE JOBS ########################################################################################################
   terraform-validate:
     name: Terraform Validate
     runs-on: ubuntu-latest
@@ -124,6 +127,7 @@ jobs:
           echo "yes" | terraform init 
           echo "yes" | terraform validate 
 
+################################################################################################### TERRAFORM PLAN JOBS ########################################################################################################
   terraform-plan:
     name: Terraform Plan
     runs-on: ubuntu-latest
@@ -173,7 +177,7 @@ jobs:
         run: |
           conftest test --policy ../../policy tfplan.json --all-namespaces  
 
-
+################################################################################################### TERRAFORM APPLY JOBS ########################################################################################################
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
@@ -204,14 +208,14 @@ jobs:
         with:
           terraform_version: 1.5.0
 
-      - name: Terraform Init
+      - name: Terraform Apply
         run: |
           export TF_VAR_snake_game_db_password=$(gcloud secrets versions access latest --secret="snake-game"  --project $PROJECT_ID | jq -r ".\"postgres-password\"" )   
           echo "yes" | terraform init 
           echo "yes" | terraform plan 
           terraform apply -auto-approve 
 
-  
+################################################################################################### DEPLOY JOBS ########################################################################################################
   deploy:
     name: Deploy to GKE
     runs-on: ubuntu-latest
@@ -237,6 +241,7 @@ jobs:
 
       - name: Configure kubectl
         run: |
+          gcloud components install gke-gcloud-auth-plugin
           gcloud container clusters get-credentials ${{ env.GKE_CLUSTER }} \
             --region ${{ env.GKE_REGION }} \
             --project ${{ env.PROJECT_ID }}
