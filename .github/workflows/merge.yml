@@ -68,7 +68,7 @@ jobs:
   deploy-secrets:
     name: Deploy Secrets to GKE
     runs-on: ubuntu-latest
-    needs: terraform-apply
+    #needs: terraform-apply
     permissions:
       contents: 'read'
       id-token: 'write'
